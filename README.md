@@ -1,10 +1,6 @@
-# Confidential Voting
+# Privacy Maximalist Token Mixer
 
-This example shows how to use Arcium to build a confidential voting system.
-
-## Overview
-
-Anyone can create a poll for people to vote on confidentially. At the end of the poll, the results are revealed and the winning option is determined. Currently, only yes/no votes are supported.
+A token mixer with confidential transfer amounts/balances powered by Arcium. This decouples withdrawals from deposits AND decouples withdrawal amounts from deposit amounts, setting the upper bound for a withdrawal to the size of the mixer itself.
 
 ## Setup
 
