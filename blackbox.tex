@@ -1,0 +1,101 @@
+% blackbox.tex - Whitepaper for Arcium-Based Encrypted Token Mixer
+
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amsfonts, amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{color}
+\usepackage{lipsum}
+
+\title{Blackbox: A Token Mixer with Encrypted Transfer Amounts for Maximal Privacy}
+\author{calmdentist}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This whitepaper introduces a novel mixer design that leverages Arcium's homomorphic encryption to maintain privacy on-chain. Unlike traditional mixers (e.g., Tornado Cash), this system not only decouples withdrawals from deposits but also encrypts both the public keys and the balances. In our design, all sensitive data is encrypted on the client side and processed homomorphically by the smart contract. This means that internal transfers and withdrawals can be executed without tying specific deposits to withdrawals, and without revealing the involved public keys or amounts.
+\end{abstract}
+
+\section{Introduction}
+Privacy-preserving transactions are increasingly important in decentralized finance. Traditional mixers obscure linkages between deposit and withdrawal events but still tie specific deposits to withdrawals. In contrast, our architecture leverages Arcium's homomorphic encryption to operate on an entirely encrypted domain, thereby decoupling deposit events from withdrawals. By encrypting both user public keys and balances, internal transfers are handled without exposing sensitive mapping details. The system relies on client-side encryption and cryptographic operations on encrypted data; thus, it eliminates the need for additional zero-knowledge proofs or Merkle trees to achieve privacy.
+
+\section{Background}
+\subsection{Homomorphic Encryption with Arcium}
+Homomorphic encryption allows arithmetic operations to be performed in the encrypted domain. Given an encryption function \( Enc(\cdot) \) that is additively homomorphic, for any plaintext values \( a \) and \( b \) we have:
+\[
+Enc(a) \oplus Enc(b) = Enc(a+b)
+\]
+Arcium's framework efficiently implements such encryption, ensuring that data remains confidential during all on-chain computations.
+
+\subsection{Encrypted Mappings and Mixer Designs Compared}
+Traditional mixers rely on linking deposits with withdrawals through either direct mapping or through Merkle trees combined with zero-knowledge proofs. In our protocol, we maintain an encrypted mapping:
+\[
+\texttt{mapping}(\text{Enc(pubkey)} \rightarrow \text{Enc(balance)})
+\]
+By encrypting both the public key and the balance, the system guarantees that the linkage between deposit and withdrawal events is obscured. Even when internal transfers occur between addresses, the recipient's public key is passed as an encrypted input. Although external observers may only detect that a transfer happened, they cannot determine the identities involved or the amounts transferred.
+
+\section{System Architecture}
+
+The core component is an on-chain smart contract that maintains an encrypted state consisting of mappings from encrypted public keys to encrypted balances. All operations — deposits, internal transfers, and withdrawals — are performed in the encrypted domain.
+
+\subsection{Deposit}
+\begin{itemize}
+    \item A user deposits tokens by transferring them from their address to the central pool.
+    \item The deposit amount \( d \) is encrypted as \( Enc(d) \) on the client side.
+    \item The user's encrypted balance is updated homomorphically:
+    \[
+    Enc(b') = Enc(b) \oplus Enc(d)
+    \]
+    \item Simultaneously, the public key is encrypted ensuring that the mapping remains in the form:
+    \[
+    \text{Enc(pubkey)} \rightarrow \text{Enc(balance)}
+    \]
+\end{itemize}
+
+\subsection{Internal Transfers}
+\begin{itemize}
+    \item Instead of transferring tokens between accounts on-chain, internal transfers update the encrypted balances.
+    \item To transfer funds to another user, the sender provides an encrypted version of the recipient's public key along with the transfer amount.
+    \item The sender's balance is reduced and the recipient's balance is increased by the transferred amount:
+    \[
+    \begin{aligned}
+    Enc(b_{\text{sender}}') &= Enc(b_{\text{sender}}) \oplus Enc(-\Delta) \\
+    Enc(b_{\text{recipient}}') &= Enc(b_{\text{recipient}}) \oplus Enc(\Delta)
+    \end{aligned}
+    \]
+    \item After every update, the entire mapping is re-encrypted so that even the section corresponding to the modified accounts cannot be directly correlated with a specific transaction.
+\end{itemize}
+
+\subsection{Withdrawal}
+\begin{itemize}
+    \item Users initiate a withdrawal by specifying a desired amount \( \Delta \) and signing the transaction with their private key.
+    \item The system verifies the user's identity by re-encrypting the signer's public key and comparing it with the stored encrypted public key.
+    \item The contract confirms that \( \Delta \) does not exceed the decrypted balance:
+    \[
+    \Delta \leq Enc^{-1}(Enc(b))
+    \]
+    \item The user's encrypted balance is updated as:
+    \[
+    Enc(b') = Enc(b) \oplus Enc(-\Delta)
+    \]
+    \item Upon successful update, tokens (up to the available pool balance) are released to the withdrawing address.
+\end{itemize}
+
+\subsection{Privacy and Decoupling}
+This architecture enforces two critical invariants:
+\begin{enumerate}
+    \item \textbf{Decoupled Withdrawals and Deposits:} Since all updates occur on an encrypted mapping whose entire state is re-encrypted after each transaction, there is no observable correlation between a specific deposit and a subsequent withdrawal.
+    \item \textbf{Decoupled Withdrawal Amounts from Deposit Amounts:} Users may withdraw any amount up to their total pool balance independent of the amounts or timings of their individual deposits.
+\end{enumerate}
+Additionally, while observers may note that a transfer or withdrawal transaction has occurred, they do not have access to the underlying plaintext public keys or amounts, ensuring that recipient identities and amounts remain private.
+
+\section{Conclusion}
+This paper outlined an advanced mixer architecture that leverages Arcium's homomorphic encryption for enhanced privacy. By maintaining an on-chain encrypted mapping from encrypted public keys to encrypted balances and performing all state transitions within the encrypted domain, we achieve robust decoupling of deposits from withdrawals. Internal transfers are executed by updating balances without revealing the specific identities involved, and the complete re-encryption of the mapping after every transaction further obfuscates any links between successive events. This design offers a significant privacy improvement over traditional mixing solutions and paves the way for future confidential transfer standards in DeFi. 
+
+For more details on the underlying technology, please refer to the \href{https://docs.arcium.com/}{Arcium Docs}.
+
+\end{document}
