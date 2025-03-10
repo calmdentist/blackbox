@@ -31,7 +31,7 @@ pub mod blackbox {
     ///
     /// The user sends an encrypted deposit amount in the form of a byte vector.
     /// This function should update the user's encrypted balance within the mixer.
-    pub fn deposit(ctx: Context<Deposit>, encrypted_amount: Vec<u8>) -> Result<()> {
+    pub fn deposit(ctx: Context<Deposit>, encrypted_amount: Vec<u8>, nonce: u128) -> Result<()> {
         // TODO: Implement deposit logic using homomorphic encryption.
         // Example steps:
         // 1. Verify the user's encrypted public key.
@@ -108,6 +108,7 @@ pub struct Withdraw<'info> {
 ///
 /// Each user account holds an encrypted public key and an encrypted balance.
 #[account]
+#[derive(InitSpace)]
 pub struct UserAccount {
     /// Encrypted public key of the user.
     pub encrypted_pubkey: Vec<u8>,
