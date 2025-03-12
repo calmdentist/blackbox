@@ -72,44 +72,14 @@ pub mod blackbox {
         Ok(())
     }
 
-    /// Initializes the computation definitions for the blackbox program.
-    ///
-    /// This must be called once before any other operations can be performed.
-    #[init_computation_definition_accounts]
-    pub fn init_computation_definitions(ctx: Context<InitComputationDefinitions>) -> Result<()> {
-        // Initialize deposit computation definition
+    /// Initializes the deposit computation definition.
+    pub fn init_deposit_comp_def(ctx: Context<InitDepositCompDef>) -> Result<()> {
         init_comp_def(
-            &ctx.accounts.arcium_program,
-            &ctx.accounts.comp_def_deposit,
-            &ctx.accounts.payer,
-            &ctx.accounts.system_program,
-            COMP_DEF_OFFSET_DEPOSIT,
-            "deposit".to_string(),
-            "Deposit funds into blackbox".to_string(),
+            ctx.accounts,
+            true,
+            Some("deposit".to_string()),
+            Some("Deposit funds into blackbox".to_string()),
         )?;
-
-        // Initialize transfer computation definition
-        init_comp_def(
-            &ctx.accounts.arcium_program,
-            &ctx.accounts.comp_def_transfer,
-            &ctx.accounts.payer,
-            &ctx.accounts.system_program,
-            COMP_DEF_OFFSET_TRANSFER,
-            "transfer".to_string(),
-            "Transfer funds within blackbox".to_string(),
-        )?;
-
-        // Initialize withdraw computation definition
-        init_comp_def(
-            &ctx.accounts.arcium_program,
-            &ctx.accounts.comp_def_withdraw,
-            &ctx.accounts.payer,
-            &ctx.accounts.system_program,
-            COMP_DEF_OFFSET_WITHDRAW,
-            "withdraw".to_string(),
-            "Withdraw funds from blackbox".to_string(),
-        )?;
-
         Ok(())
     }
 
@@ -151,19 +121,7 @@ pub mod blackbox {
     /// Deposit callback
     #[arcium_callback]
     pub fn deposit_callback(ctx: Context<DepositCallback>, output: Vec<u8>) -> Result<()> {
-        let user_pubkey = ctx.accounts.user.key();
-        
-        // Find or create user entry in mapping accounts
-        let (account_idx, entry_idx) = find_or_create_user_entry(
-            &mut ctx.accounts.mapping_accounts,
-            user_pubkey,
-            encrypted_amount,
-        )?;
-        
-        // Update user's encrypted balance
-        // In a real implementation, this would use homomorphic addition
-        // For now, we just replace the balance with the encrypted amount
-        ctx.accounts.mapping_accounts[account_idx].encrypted_balances[entry_idx] = encrypted_amount;
+        // TODO: Implement deposit callback
         
         Ok(())
     }
@@ -203,31 +161,18 @@ pub mod blackbox {
     /// Transfer callback
     #[arcium_callback]
     pub fn transfer_callback(ctx: Context<Transfer>, encrypted_amount: [u8; 32], nonce: u128) -> Result<()> {
-        let sender_pubkey = ctx.accounts.sender.key();
-        let recipient_pubkey = ctx.accounts.recipient.key();
-        
-        // Find sender entry
-        let (sender_account_idx, sender_entry_idx) = find_user_entry(
-            &ctx.accounts.mapping_accounts,
-            sender_pubkey,
+        // TODO: Implement transfer callback
+        Ok(())
+    }
+
+    /// Initializes the withdraw computation definition.
+    pub fn init_withdraw_comp_def(ctx: Context<InitWithdrawCompDef>) -> Result<()> {
+        init_comp_def(
+            ctx.accounts,
+            true,
+            Some("withdraw".to_string()),
+            Some("Withdraw funds from blackbox".to_string()),
         )?;
-        
-        // Find or create recipient entry
-        let (recipient_account_idx, recipient_entry_idx) = find_or_create_user_entry(
-            &mut ctx.accounts.mapping_accounts,
-            recipient_pubkey,
-            [0; 32], // Initial balance will be updated below
-        )?;
-        
-        // In a real implementation, this would use homomorphic operations:
-        // 1. Subtract from sender's balance
-        // 2. Add to recipient's balance
-        
-        // For now, we just update the balances directly
-        // This is a placeholder for the actual homomorphic operations
-        ctx.accounts.mapping_accounts[sender_account_idx].encrypted_balances[sender_entry_idx] = [0; 32];
-        ctx.accounts.mapping_accounts[recipient_account_idx].encrypted_balances[recipient_entry_idx] = encrypted_amount;
-        
         Ok(())
     }
 
@@ -260,81 +205,12 @@ pub mod blackbox {
     /// Withdraw callback
     #[arcium_callback]
     pub fn withdraw_callback(ctx: Context<Withdraw>, encrypted_amount: [u8; 32], nonce: u128) -> Result<()> {
-        let user_pubkey = ctx.accounts.user.key();
-        
-        // Find user entry
-        let (account_idx, entry_idx) = find_user_entry(
-            &ctx.accounts.mapping_accounts,
-            user_pubkey,
-        )?;
-        
-        // In a real implementation, this would:
-        // 1. Verify the user has sufficient balance using homomorphic comparison
-        // 2. Subtract the withdrawal amount from the user's balance
-        
-        // For now, we just update the balance directly
-        // This is a placeholder for the actual homomorphic operations
-        ctx.accounts.mapping_accounts[account_idx].encrypted_balances[entry_idx] = [0; 32];
-        
+        // TODO: implement
         Ok(())
     }
 }
 
-/// Helper function to find a user's entry in the mapping accounts
-/// Returns (account_index, entry_index) if found, or an error if not found
-fn find_user_entry(
-    mapping_accounts: &[Account<MappingAccount>],
-    user_pubkey: Pubkey,
-) -> Result<(usize, usize)> {
-    // Convert user pubkey to [u8; 32] for comparison
-    let user_pubkey_bytes: [u8; 32] = user_pubkey.to_bytes();
-    
-    // Search through all mapping accounts
-    for (account_idx, account) in mapping_accounts.iter().enumerate() {
-        // Search through all entries in this account
-        for (entry_idx, encrypted_pubkey) in account.encrypted_pubkeys.iter().enumerate() {
-            // In a real implementation, this would use homomorphic comparison
-            // For now, we just do a direct comparison (which wouldn't work with real encryption)
-            if encrypted_pubkey == &user_pubkey_bytes {
-                return Ok((account_idx, entry_idx));
-            }
-        }
-    }
-    
-    // User not found
-    Err(error!(ErrorCode::UserNotFound))
-}
 
-/// Helper function to find or create a user entry in the mapping accounts
-/// Returns (account_index, entry_index) of the found or created entry
-fn find_or_create_user_entry(
-    mapping_accounts: &mut [Account<MappingAccount>],
-    user_pubkey: Pubkey,
-    initial_balance: [u8; 32],
-) -> Result<(usize, usize)> {
-    // Try to find existing user
-    match find_user_entry(mapping_accounts, user_pubkey) {
-        Ok(indices) => Ok(indices),
-        Err(_) => {
-            // User not found, create new entry
-            let user_pubkey_bytes: [u8; 32] = user_pubkey.to_bytes();
-            
-            // Find an account with space available
-            for (account_idx, account) in mapping_accounts.iter_mut().enumerate() {
-                // Check if this account has space for a new entry
-                if account.encrypted_pubkeys.len() < MAX_ENTRIES_PER_ACCOUNT {
-                    // Add the new entry
-                    account.encrypted_pubkeys.push(user_pubkey_bytes);
-                    account.encrypted_balances.push(initial_balance);
-                    return Ok((account_idx, account.encrypted_pubkeys.len() - 1));
-                }
-            }
-            
-            // No account with space found
-            Err(error!(ErrorCode::NoSpaceAvailable))
-        }
-    }
-}
 
 /// Accounts for initializing a blackbox for a specific token
 #[derive(Accounts)]
@@ -368,37 +244,66 @@ pub struct InitBlackbox<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Accounts for initializing computation definitions
+/// Accounts for initializing the deposit computation definition
+#[init_computation_definition_accounts("deposit", payer)]
 #[derive(Accounts)]
-pub struct InitComputationDefinitions<'info> {
-    pub arcium_program: Program<'info, Arcium>,
-    
-    #[account(
-        mut,
-        seeds = [COMP_DEF_PDA_SEED, &COMP_DEF_OFFSET_DEPOSIT.to_le_bytes()],
-        seeds::program = ARCIUM_PROG_ID,
-        bump,
-    )]
-    pub comp_def_deposit: Account<'info, ComputationDefinitionAccount>,
-    
-    #[account(
-        mut,
-        seeds = [COMP_DEF_PDA_SEED, &COMP_DEF_OFFSET_TRANSFER.to_le_bytes()],
-        seeds::program = ARCIUM_PROG_ID,
-        bump,
-    )]
-    pub comp_def_transfer: Account<'info, ComputationDefinitionAccount>,
-    
-    #[account(
-        mut,
-        seeds = [COMP_DEF_PDA_SEED, &COMP_DEF_OFFSET_WITHDRAW.to_le_bytes()],
-        seeds::program = ARCIUM_PROG_ID,
-        bump,
-    )]
-    pub comp_def_withdraw: Account<'info, ComputationDefinitionAccount>,
-    
+pub struct InitDepositCompDef<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [MXE_PDA_SEED, ID_CONST.to_bytes().as_ref()],
+        seeds::program = ARCIUM_PROG_ID,
+        bump = mxe_account.bump
+    )]
+    pub mxe_account: Box<Account<'info, PersistentMXEAccount>>,
+    #[account(mut)]
+    /// CHECK: comp_def_account, checked by arcium program.
+    /// Can't check it here as it's not initialized yet.
+    pub comp_def_account: UncheckedAccount<'info>,
+    pub arcium_program: Program<'info, Arcium>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Accounts for initializing the transfer computation definition
+#[init_computation_definition_accounts("transfer", payer)]
+#[derive(Accounts)]
+pub struct InitTransferCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [MXE_PDA_SEED, ID_CONST.to_bytes().as_ref()],
+        seeds::program = ARCIUM_PROG_ID,
+        bump = mxe_account.bump
+    )]
+    pub mxe_account: Box<Account<'info, PersistentMXEAccount>>,
+    #[account(mut)]
+    /// CHECK: comp_def_account, checked by arcium program.
+    /// Can't check it here as it's not initialized yet.
+    pub comp_def_account: UncheckedAccount<'info>,
+    pub arcium_program: Program<'info, Arcium>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Accounts for initializing the withdraw computation definition
+#[init_computation_definition_accounts("withdraw", payer)]
+#[derive(Accounts)]
+pub struct InitWithdrawCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [MXE_PDA_SEED, ID_CONST.to_bytes().as_ref()],
+        seeds::program = ARCIUM_PROG_ID,
+        bump = mxe_account.bump
+    )]
+    pub mxe_account: Box<Account<'info, PersistentMXEAccount>>,
+    #[account(mut)]
+    /// CHECK: comp_def_account, checked by arcium program.
+    /// Can't check it here as it's not initialized yet.
+    pub comp_def_account: UncheckedAccount<'info>,
+    pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
 
